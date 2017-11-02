@@ -52,7 +52,109 @@ __global__ void matrix_softmax_cross_entropy_kernel(int nrow, int ncol,
   }
 }
 
-int DLGpuArraySet(DLArrayHandle arr, float value) { /* TODO: Your code here */
+// TODO: parallelize
+__global__ void matrix_elementwise_add_kernel(int nrow, int ncol,
+                                              const float *matA,
+                                              const float *matB,
+                                              float *output) {
+  // Two dimensional thread blocks.
+  int tid = blockIdx.x * blockDim.x * blockDim.y + 
+            threadIdx.y * blockDim.x +
+            threadIdx.x;
+  for (int i = 0; i < nrow; ++i) {
+    for (int j = 0; j < ncol; ++j) {
+      output[i][j] = matA[i][j] + matB[i][j];
+    }
+  }
+}
+
+// TODO: parallelize
+__global__ void matrix_elementwise_add_by_const_kernel(int nrow, int ncol,
+                                                       const float *input,
+                                                       const float val,
+                                                       float *output) {
+  // Two dimensional thread blocks.
+  int tid = blockIdx.x * blockDim.x * blockDim.y + 
+            threadIdx.y * blockDim.x +
+            threadIdx.x;
+  for (int i = 0; i < nrow; ++i) {
+    for (int j = 0; j < ncol; ++j) {
+      output[i][j] = input[i][j] + val;
+    }
+  }
+}
+
+// TODO: parallelize
+__global__ void matrix_elementwise_multiply_kernel(int nrow, int ncol,
+                                                   const float *matA,
+                                                   const float *matB,
+                                                   float *output) {
+  // Two dimensional thread blocks.
+  int tid = blockIdx.x * blockDim.x * blockDim.y + 
+            threadIdx.y * blockDim.x +
+            threadIdx.x;
+  for (int i = 0; i < nrow; ++i) {
+    for (int j = 0; j < ncol; ++j) {
+      output[i][j] = matA[i][j] * matB[i][j];
+    }
+  }
+}
+
+// TODO: parallelize
+__global__ void matrix_elementwise_multiply_by_const_kernel(int nrow, int ncol,
+                                                            const float *input,
+                                                            const float val,
+                                                            float *output) {
+  // Two dimensional thread blocks.
+  int tid = blockIdx.x * blockDim.x * blockDim.y + 
+            threadIdx.y * blockDim.x +
+            threadIdx.x;
+  for (int i = 0; i < nrow; ++i) {
+    for (int j = 0; j < ncol; ++j) {
+      output[i][j] = input[i][j] * val;
+    }
+  }
+}
+
+// TODO: parallelize
+__global__ void array_set_kernel(int nrow, int ncol,
+                                float *arr,
+                                const float val) {
+  // Two dimensional thread blocks.
+  int tid = blockIdx.x * blockDim.x * blockDim.y + 
+            threadIdx.y * blockDim.x +
+            threadIdx.x;
+  for (int i = 0; i < nrow; ++i) {
+    for (int j = 0; j < ncol; ++j) {
+      arr[i][j] = val;
+    }
+  }
+
+}
+
+int DLGpuArraySet(DLArrayHandle arr, float value) { 
+  /* TODO: Your code here */
+  assert(arr->ndim == 2);
+  int nrow = arr->shape[0];
+  // Maximum x- or y-dimension of a block = 1024
+  // But we need 'nrow' shared memory, and max shared memory is 48KB.
+  // Conservatively allow max 16KB shared memory.
+  assert(nrow <= 1024 * 4);
+  int ncol = arr->shape[1];
+  const float *input_data = (const float *)arr->data;
+  dim3 threads;
+  if (nrow <= 1024) {
+    threads.x = nrow;
+  } else {
+    threads.x = 1024;
+    threads.y = (nrow + 1023) / 1024;
+  }
+  // 1 block, each block with 'threads' number of threads with 'nrow' shared
+  // memory size
+  array_set_kernel<<<1, threads, nrow * sizeof(float)>>>(nrow, 
+                                                         ncol, 
+                                                         arr, 
+                                                         val);
   return 0;
 }
 
@@ -69,12 +171,58 @@ int DLGpuReduceSumAxisZero(const DLArrayHandle input, DLArrayHandle output) {
 int DLGpuMatrixElementwiseAdd(const DLArrayHandle matA,
                               const DLArrayHandle matB, DLArrayHandle output) {
   /* TODO: Your code here */
+  assert(matA->ndim == 2);
+  assert(matB->ndim == 2);
+  assert(output->ndim == 2);
+  assert(matA->shape[0] == matB->shape[0] &&
+         matA->shape[1] == matB->shape[1]); 
+  int nrow = matA->shape[0];
+  // Maximum x- or y-dimension of a block = 1024
+  // But we need 'nrow' shared memory, and max shared memory is 48KB.
+  // Conservatively allow max 16KB shared memory.
+  assert(nrow <= 1024 * 4);
+  int ncol = matA->shape[1];
+  const float *matA_data = (const float *)matA->data;
+  const float *matB_data = (const float *)matB->data;
+  float *output_data = (float *)output->data;
+  dim3 threads;
+  if (nrow <= 1024) {
+    threads.x = nrow;
+  } else {
+    threads.x = 1024;
+    threads.y = (nrow + 1023) / 1024;
+  }
+  // 1 block, each block with 'threads' number of threads with 'nrow' shared
+  // memory size
+  matrix_elementwise_add_kernel<<<1, threads, nrow * sizeof(float)>>>(
+      nrow, ncol, matA_data, matB_data, output_data);
   return 0;
 }
 
 int DLGpuMatrixElementwiseAddByConst(const DLArrayHandle input, float val,
                                      DLArrayHandle output) {
   /* TODO: Your code here */
+  assert(input->ndim == 2);
+  assert(output->ndim == 2);
+  int nrow = input->shape[0];
+  // Maximum x- or y-dimension of a block = 1024
+  // But we need 'nrow' shared memory, and max shared memory is 48KB.
+  // Conservatively allow max 16KB shared memory.
+  assert(nrow <= 1024 * 4);
+  int ncol = input->shape[1];
+  const float *input_data = (const float *)input->data;
+  float *output_data = (float *)output->data;
+  dim3 threads;
+  if (nrow <= 1024) {
+    threads.x = nrow;
+  } else {
+    threads.x = 1024;
+    threads.y = (nrow + 1023) / 1024;
+  }
+  // 1 block, each block with 'threads' number of threads with 'nrow' shared
+  // memory size
+  matrix_elementwise_add_by_const_kernel<<<1, threads, nrow * sizeof(float)>>>(
+      nrow, ncol, input_data, val, output_data);
   return 0;
 }
 
@@ -82,12 +230,58 @@ int DLGpuMatrixElementwiseMultiply(const DLArrayHandle matA,
                                    const DLArrayHandle matB,
                                    DLArrayHandle output) {
   /* TODO: Your code here */
+  assert(matA->ndim == 2);
+  assert(matB->ndim == 2);
+  assert(output->ndim == 2);
+  assert(matA->shape[0] == matB->shape[0] &&
+         matA->shape[1] == matB->shape[1]); 
+  int nrow = matA->shape[0];
+  // Maximum x- or y-dimension of a block = 1024
+  // But we need 'nrow' shared memory, and max shared memory is 48KB.
+  // Conservatively allow max 16KB shared memory.
+  assert(nrow <= 1024 * 4);
+  int ncol = matA->shape[1];
+  const float *matA_data = (const float *)matA->data;
+  const float *matB_data = (const float *)matB->data;
+  float *output_data = (float *)output->data;
+  dim3 threads;
+  if (nrow <= 1024) {
+    threads.x = nrow;
+  } else {
+    threads.x = 1024;
+    threads.y = (nrow + 1023) / 1024;
+  }
+  // 1 block, each block with 'threads' number of threads with 'nrow' shared
+  // memory size
+  matrix_elementwise_multiply_kernel<<<1, threads, nrow * sizeof(float)>>>(
+      nrow, ncol, matA_data, matB_data, output_data);
   return 0;
 }
 
 int DLGpuMatrixMultiplyByConst(const DLArrayHandle input, float val,
                                DLArrayHandle output) {
   /* TODO: Your code here */
+  assert(input->ndim == 2);
+  assert(output->ndim == 2);
+  int nrow = input->shape[0];
+  // Maximum x- or y-dimension of a block = 1024
+  // But we need 'nrow' shared memory, and max shared memory is 48KB.
+  // Conservatively allow max 16KB shared memory.
+  assert(nrow <= 1024 * 4);
+  int ncol = input->shape[1];
+  const float *input_data = (const float *)input->data;
+  float *output_data = (float *)output->data;
+  dim3 threads;
+  if (nrow <= 1024) {
+    threads.x = nrow;
+  } else {
+    threads.x = 1024;
+    threads.y = (nrow + 1023) / 1024;
+  }
+  // 1 block, each block with 'threads' number of threads with 'nrow' shared
+  // memory size
+  matrix_elementwise_multiply_by_const_kernel<<<1, threads, nrow * sizeof(float)>>>(
+      nrow, ncol, input_data, val, output_data);
   return 0;
 }
 

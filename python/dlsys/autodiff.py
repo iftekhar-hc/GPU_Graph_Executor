@@ -2,7 +2,8 @@
 from __future__ import absolute_import
 
 import numpy as np
-from . import ndarray, gpu_op
+from ndarray import ndarray
+from gpu_op import gpu_op
 
 
 class Node(object):

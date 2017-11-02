@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from ._base import _LIB, check_call, c_array
+from _base import _LIB, check_call, c_array
 import ctypes
 import numpy as np
 
