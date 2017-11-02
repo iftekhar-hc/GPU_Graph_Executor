@@ -2,9 +2,7 @@
 from __future__ import absolute_import
 
 import numpy as np
-from ndarray import ndarray
-from gpu_op import gpu_op
-
+from . import ndarray, gpu_op
 
 class Node(object):
     """Node in a computation graph."""
@@ -327,7 +325,7 @@ class MatMulOp(Op):
              node.matmul_attr_trans_B is True:
             axis_0_dim = input_shapes[0][1]
             axis_1_dim = input_shapes[1][0]
-        output_shape = tuple(axis_0_dim, axis_1_dim)
+        output_shape = (axis_0_dim, axis_1_dim)
         return output_shape
 
 class PlaceholderOp(Op):
@@ -615,6 +613,9 @@ class Executor(object):
         """
         """TODO: Your code here"""
         for node in self.topo_order:
+          if node in feed_shapes:
+              # Skip placeholder nodes. Values already provided by feed_dict.
+              continue
           input_shapes = list()
           for input_node in node.inputs:
             input_shapes.append(feed_shapes[input_node])
