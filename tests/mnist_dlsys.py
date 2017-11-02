@@ -1,4 +1,3 @@
-from __future__ import print_function
 from dlsys import autodiff as ad
 from dlsys import ndarray, gpu_op
 import numpy as np
@@ -7,9 +6,7 @@ import argparse
 import six.moves.cPickle as pickle
 import gzip
 import os
-import sys
 
-sys.path.append(path.dirname(path.dirname(path.abspath('./python/dlsys'))))
 
 def load_mnist_data(dataset):
     """ Load the dataset
