@@ -120,7 +120,7 @@ int DLGpuArraySet(DLArrayHandle arr, float value) {
   // Conservatively allow max 16KB shared memory.
   assert(nrow <= 1024 * 4);
   int ncol = arr->shape[1];
-  const float *input_data = (const float *)arr->data;
+  float *input_data = (float *)arr->data;
   dim3 threads;
   if (nrow <= 1024) {
     threads.x = nrow;
