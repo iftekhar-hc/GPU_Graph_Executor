@@ -57,14 +57,11 @@ __global__ void matrix_elementwise_add_kernel(int nrow, int ncol,
                                               const float *matA,
                                               const float *matB,
                                               float *output) {
-  // Two dimensional thread blocks.
-  int tid = blockIdx.x * blockDim.x * blockDim.y + 
-            threadIdx.y * blockDim.x +
-            threadIdx.x;
-  for (int i = 0; i < nrow; ++i) {
-    for (int j = 0; j < ncol; ++j) {
-      output[i][j] = matA[i][j] + matB[i][j];
-    }
+  int col_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
+  int idx = row_idx * ncol + col_idx
+  if (row_idx < nrow && col_idx < ncol) {
+    output[idx] = matA[idx] + matB[idx];
   }
 }
 
