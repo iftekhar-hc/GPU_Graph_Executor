@@ -72,7 +72,7 @@ __global__ void matrix_elementwise_add_by_const_kernel(int nrow, int ncol,
   int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
   int idx = row_idx * ncol + col_idx;
   if (row_idx < nrow && col_idx < ncol) {
-    output[idx] = matA[idx] + val;
+    output[idx] = input[idx] + val;
   }
 }
 
@@ -96,11 +96,10 @@ __global__ void matrix_elementwise_multiply_by_const_kernel(int nrow, int ncol,
   int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
   int idx = row_idx * ncol + col_idx;
   if (row_idx < nrow && col_idx < ncol) {
-    output[idx] = matA[idx] * val;
+    output[idx] = input[idx] * val;
   }
 }
 
-// TODO: parallelize
 __global__ void array_set_kernel(int nrow, int ncol,
                                 float *arr,
                                 const float val) {
@@ -133,8 +132,8 @@ int DLGpuArraySet(DLArrayHandle arr, float value) {
   // memory size
   array_set_kernel<<<1, threads, nrow * sizeof(float)>>>(nrow, 
                                                          ncol, 
-                                                         arr, 
-                                                         val);
+                                                         input_data, 
+                                                         value);
   return 0;
 }
 
