@@ -58,7 +58,7 @@ __global__ void matrix_elementwise_add_kernel(int nrow, int ncol,
                                               float *output) {
   int col_idx = blockIdx.x * blockDim.x + threadIdx.x;
   int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
-  int idx = row_idx * ncol + col_idx
+  int idx = row_idx * ncol + col_idx;
   if (row_idx < nrow && col_idx < ncol) {
     output[idx] = matA[idx] + matB[idx];
   }
@@ -70,7 +70,7 @@ __global__ void matrix_elementwise_add_by_const_kernel(int nrow, int ncol,
                                                        float *output) {
   int col_idx = blockIdx.x * blockDim.x + threadIdx.x;
   int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
-  int idx = row_idx * ncol + col_idx
+  int idx = row_idx * ncol + col_idx;
   if (row_idx < nrow && col_idx < ncol) {
     output[idx] = matA[idx] + val;
   }
@@ -82,7 +82,7 @@ __global__ void matrix_elementwise_multiply_kernel(int nrow, int ncol,
                                                    float *output) {
   int col_idx = blockIdx.x * blockDim.x + threadIdx.x;
   int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
-  int idx = row_idx * ncol + col_idx
+  int idx = row_idx * ncol + col_idx;
   if (row_idx < nrow && col_idx < ncol) {
     output[idx] = matA[idx] * matB[idx];
   }
@@ -94,7 +94,7 @@ __global__ void matrix_elementwise_multiply_by_const_kernel(int nrow, int ncol,
                                                             float *output) {
   int col_idx = blockIdx.x * blockDim.x + threadIdx.x;
   int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
-  int idx = row_idx * ncol + col_idx
+  int idx = row_idx * ncol + col_idx;
   if (row_idx < nrow && col_idx < ncol) {
     output[idx] = matA[idx] * val;
   }
@@ -106,7 +106,7 @@ __global__ void array_set_kernel(int nrow, int ncol,
                                 const float val) {
   int col_idx = blockIdx.x * blockDim.x + threadIdx.x;
   int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
-  int idx = row_idx * ncol + col_idx
+  int idx = row_idx * ncol + col_idx;
   if (row_idx < nrow && col_idx < ncol) {
     arr[idx] = val;
   }
