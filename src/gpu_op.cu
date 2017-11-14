@@ -4,6 +4,17 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
+#define CHECK_GPU_ERR(ans) { gpu_assert((ans), __FILE__, __LINE__); }
+
+inline void gpu_assert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPU_assert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
 /* TODO: Your code here */
 /* all your GPU kernel code, e.g. matrix_softmax_cross_entropy_kernel */
 
@@ -56,23 +67,31 @@ __global__ void matrix_elementwise_add_kernel(int nrow, int ncol,
                                               const float *matA,
                                               const float *matB,
                                               float *output) {
-  int col_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
-  int idx = row_idx * ncol + col_idx;
+#if 1
+  int row_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int col_idx = blockIdx.y * blockDim.y + threadIdx.y;
+  int idx = row_idx * ncol;
+  // int idx = col_idx + row_idx * ncol;
+  // printf("row_idx = %d, col_idx = %d\n", row_idx, col_idx);
+  // printf("tid = %d ", idx);
   if (row_idx < nrow && col_idx < ncol) {
-    output[idx] = matA[idx] + matB[idx];
+    for (size_t i = col_idx; i < ncol; ++i) {
+      output[idx + i] = matA[idx + i] + matB[idx + i];
+    }
   }
+#endif
 }
 
 __global__ void matrix_elementwise_add_by_const_kernel(int nrow, int ncol,
                                                        const float *input,
                                                        const float val,
                                                        float *output) {
-  int col_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
-  int idx = row_idx * ncol + col_idx;
+  int row_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int col_idx = blockIdx.y * blockDim.y + threadIdx.y;
+  int idx = row_idx * ncol;
   if (row_idx < nrow && col_idx < ncol) {
-    output[idx] = input[idx] + val;
+    for (size_t i = 0; i < ncol; ++i)
+      output[idx + i] = input[idx + i] + val;
   }
 }
 
@@ -80,11 +99,12 @@ __global__ void matrix_elementwise_multiply_kernel(int nrow, int ncol,
                                                    const float *matA,
                                                    const float *matB,
                                                    float *output) {
-  int col_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
-  int idx = row_idx * ncol + col_idx;
+  int row_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int col_idx = blockIdx.y * blockDim.y + threadIdx.y;
+  int idx = row_idx * ncol;
   if (row_idx < nrow && col_idx < ncol) {
-    output[idx] = matA[idx] * matB[idx];
+    for (size_t i = 0; i < ncol; ++i)
+      output[idx + i] = matA[idx + i] * matB[idx + i];
   }
 }
 
@@ -92,22 +112,24 @@ __global__ void matrix_elementwise_multiply_by_const_kernel(int nrow, int ncol,
                                                             const float *input,
                                                             const float val,
                                                             float *output) {
-  int col_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
-  int idx = row_idx * ncol + col_idx;
+  int row_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int col_idx = blockIdx.y * blockDim.y + threadIdx.y;
+  int idx = row_idx * ncol;
   if (row_idx < nrow && col_idx < ncol) {
-    output[idx] = input[idx] * val;
+    for (size_t i = 0; i < ncol; ++i)
+      output[idx + i] = input[idx + i] * val;
   }
 }
 
 __global__ void array_set_kernel(int nrow, int ncol,
                                 float *arr,
                                 const float val) {
-  int col_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  int row_idx = blockIdx.y * blockDim.y + threadIdx.y;
-  int idx = row_idx * ncol + col_idx;
+  int row_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int col_idx = blockIdx.y * blockDim.y + threadIdx.y;
+  int idx = row_idx * ncol;
   if (row_idx < nrow && col_idx < ncol) {
-    arr[idx] = val;
+    for (size_t i = 0; i < ncol; ++i)
+      arr[idx + i] = val;
   }
 }
 
@@ -122,18 +144,19 @@ int DLGpuArraySet(DLArrayHandle arr, float value) {
   int ncol = arr->shape[1];
   float *input_data = (float *)arr->data;
   dim3 threads;
-  if (nrow <= 1024) {
+  if (nrow * ncol <= 1024) {
     threads.x = nrow;
+    threads.y = ncol;
   } else {
-    threads.x = 1024;
+    threads.x = nrow;
     threads.y = (nrow + 1023) / 1024;
   }
   // 1 block, each block with 'threads' number of threads with 'nrow' shared
   // memory size
-  array_set_kernel<<<1, threads, nrow * sizeof(float)>>>(nrow, 
-                                                         ncol, 
-                                                         input_data, 
-                                                         value);
+  array_set_kernel<<<1, threads>>>(nrow, 
+                                   ncol, 
+                                   input_data, 
+                                   value);
   return 0;
 }
 
@@ -165,16 +188,20 @@ int DLGpuMatrixElementwiseAdd(const DLArrayHandle matA,
   const float *matB_data = (const float *)matB->data;
   float *output_data = (float *)output->data;
   dim3 threads;
-  if (nrow <= 1024) {
+  if (nrow * ncol <= 1024) {
     threads.x = nrow;
+    threads.y = ncol;
   } else {
-    threads.x = 1024;
+    threads.x = nrow;
     threads.y = (nrow + 1023) / 1024;
+    // threads.y = ncol;
   }
   // 1 block, each block with 'threads' number of threads with 'nrow' shared
   // memory size
-  matrix_elementwise_add_kernel<<<1, threads, nrow * sizeof(float)>>>(
+  matrix_elementwise_add_kernel<<<1, threads>>>(
       nrow, ncol, matA_data, matB_data, output_data);
+  CHECK_GPU_ERR( cudaPeekAtLastError() );
+  CHECK_GPU_ERR( cudaDeviceSynchronize() );
   return 0;
 }
 
@@ -192,16 +219,20 @@ int DLGpuMatrixElementwiseAddByConst(const DLArrayHandle input, float val,
   const float *input_data = (const float *)input->data;
   float *output_data = (float *)output->data;
   dim3 threads;
-  if (nrow <= 1024) {
+  if (nrow * ncol <= 1024) {
     threads.x = nrow;
+    threads.y = ncol;
   } else {
-    threads.x = 1024;
-    threads.y = (nrow + 1023) / 1024;
+    threads.x = min(nrow, 1024);
+    // threads.y = (nrow + 1023) / 1024;
+    threads.y = 1;
   }
   // 1 block, each block with 'threads' number of threads with 'nrow' shared
   // memory size
-  matrix_elementwise_add_by_const_kernel<<<1, threads, nrow * sizeof(float)>>>(
+  matrix_elementwise_add_by_const_kernel<<<1, threads>>>(
       nrow, ncol, input_data, val, output_data);
+  CHECK_GPU_ERR( cudaPeekAtLastError() );
+  CHECK_GPU_ERR( cudaDeviceSynchronize() );
   return 0;
 }
 
@@ -224,10 +255,11 @@ int DLGpuMatrixElementwiseMultiply(const DLArrayHandle matA,
   const float *matB_data = (const float *)matB->data;
   float *output_data = (float *)output->data;
   dim3 threads;
-  if (nrow <= 1024) {
+  if (nrow * ncol <= 1024) {
     threads.x = nrow;
+    threads.y = ncol;
   } else {
-    threads.x = 1024;
+    threads.x = nrow;
     threads.y = (nrow + 1023) / 1024;
   }
   // 1 block, each block with 'threads' number of threads with 'nrow' shared
@@ -251,10 +283,11 @@ int DLGpuMatrixMultiplyByConst(const DLArrayHandle input, float val,
   const float *input_data = (const float *)input->data;
   float *output_data = (float *)output->data;
   dim3 threads;
-  if (nrow <= 1024) {
+  if (nrow * ncol <= 1024) {
     threads.x = nrow;
+    threads.y = ncol;
   } else {
-    threads.x = 1024;
+    threads.x = nrow;
     threads.y = (nrow + 1023) / 1024;
   }
   // 1 block, each block with 'threads' number of threads with 'nrow' shared
