@@ -97,10 +97,20 @@ __global__ void matrix_elementwise_add_by_const_kernel(int nrow, int ncol,
       output[idx + i] = input[idx + i] + val;
   }
 #endif
+#if 0
   int tid_x = blockIdx.x * blockDim.x + threadIdx.x;
   int tid_y = blockIdx.y * blockDim.y + threadIdx.y;
-  printf("tid_x = %d, tid_y = %d\n", tid_x, tid_y);
+  // printf("tid_x = %d, tid_y = %d\n", tid_x, tid_y);
+  printf("%d %d %d %d\n", blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y);
   int idx = tid_y * ncol + tid_x;
+  if (tid_x < ncol && tid_y < nrow) {
+     output[idx] = input[idx] + val;
+  }
+#endif
+  unsigned tid_x = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned tid_y = blockIdx.y;
+  // printf("%d %d %d %d\n", blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y);
+  unsigned idx = tid_y * ncol + tid_x;
   if (tid_x < ncol && tid_y < nrow) {
      output[idx] = input[idx] + val;
   }
@@ -236,12 +246,16 @@ int DLGpuMatrixElementwiseAddByConst(const DLArrayHandle input, float val,
     threads.y = ncol;
   } else {
     blocks.x = (ncol + 1024 - 1) / 1024;
-    blocks.y = (nrow + 1024 - 1) / 1024;
+    // blocks.y = (nrow + 1024 - 1) / 1024;
     // blocks.x = ceil(nrow/1024.0);
     // blocks.y = ceil(ncol/1024.0);
-    threads.x = min(nrow, 1024);
+    // blocks.x = 3;
+    blocks.y = nrow;
+    threads.x = 1024;
+    // threads.y = 1;
+    // threads.x = min(nrow, 1024);
     // threads.y = (nrow + 1023) / 1024;
-    threads.y = 1;
+    // threads.y = 1;
   }
   // 1 block, each block with 'threads' number of threads with 'nrow' shared
   // memory size
