@@ -86,12 +86,23 @@ __global__ void matrix_elementwise_add_by_const_kernel(int nrow, int ncol,
                                                        const float *input,
                                                        const float val,
                                                        float *output) {
+#if 0
+  // int block_idx = blockIdx.x * gridDim.x + threadIdx.x;
   int row_idx = blockIdx.x * blockDim.x + threadIdx.x;
   int col_idx = blockIdx.y * blockDim.y + threadIdx.y;
+  printf("row_idx = %d, col_idx = %d\n", row_idx, col_idx);
   int idx = row_idx * ncol;
   if (row_idx < nrow && col_idx < ncol) {
     for (size_t i = 0; i < ncol; ++i)
       output[idx + i] = input[idx + i] + val;
+  }
+#endif
+  int tid_x = blockIdx.x * blockDim.x + threadIdx.x;
+  int tid_y = blockIdx.y * blockDim.y + threadIdx.y;
+  printf("tid_x = %d, tid_y = %d\n", tid_x, tid_y);
+  int idx = tid_y * ncol + tid_x;
+  if (tid_x < ncol && tid_y < nrow) {
+     output[idx] = input[idx] + val;
   }
 }
 
@@ -219,17 +230,22 @@ int DLGpuMatrixElementwiseAddByConst(const DLArrayHandle input, float val,
   const float *input_data = (const float *)input->data;
   float *output_data = (float *)output->data;
   dim3 threads;
+  dim3 blocks;
   if (nrow * ncol <= 1024) {
     threads.x = nrow;
     threads.y = ncol;
   } else {
+    blocks.x = (ncol + 1024 - 1) / 1024;
+    blocks.y = (nrow + 1024 - 1) / 1024;
+    // blocks.x = ceil(nrow/1024.0);
+    // blocks.y = ceil(ncol/1024.0);
     threads.x = min(nrow, 1024);
     // threads.y = (nrow + 1023) / 1024;
     threads.y = 1;
   }
   // 1 block, each block with 'threads' number of threads with 'nrow' shared
   // memory size
-  matrix_elementwise_add_by_const_kernel<<<1, threads>>>(
+  matrix_elementwise_add_by_const_kernel<<<blocks, threads>>>(
       nrow, ncol, input_data, val, output_data);
   CHECK_GPU_ERR( cudaPeekAtLastError() );
   CHECK_GPU_ERR( cudaDeviceSynchronize() );
