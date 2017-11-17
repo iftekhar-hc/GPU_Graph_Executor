@@ -218,6 +218,7 @@ __global__ void broadcast_kernel(int new_axis0_len,
                                  int ncol,
                                  const float *input,
                                  float *output) {
+#if 0
   for (size_t i = 0; i < new_axis0_len; ++i) {
     for (size_t j = 0; j < nrow; ++j) {
       for (size_t k = 0; k < ncol; ++k) {
@@ -226,13 +227,14 @@ __global__ void broadcast_kernel(int new_axis0_len,
       }
     }
   }
-#if 0
+#endif
+#if 1
   size_t col_idx = blockIdx.x;
   size_t row_idx = blockIdx.y;
   size_t axis0_idx = threadIdx.x;
   if (axis0_idx < new_axis0_len && row_idx < nrow && col_idx < ncol) {
     size_t out_idx = (axis0_idx * nrow + row_idx) * ncol + col_idx;
-    size_t in_dx = row_idx * ncol + col_idx;
+    size_t in_idx = row_idx * ncol + col_idx;
     output[out_idx] = input[in_idx];
   }
 #endif
@@ -292,6 +294,11 @@ int DLGpuBroadcastTo(const DLArrayHandle input, DLArrayHandle output) {
   float *output_data = (float *)output->data;
   dim3 blocks;
   dim3 threads;
+#if 1
+  blocks.x = ncol;
+  blocks.y = nrow;
+  threads.x = new_axis0_len;
+#endif
 #if 0
   if (nrow * ncol * new_axis0_len <= 1024) {
     threads.x = new_axis0_len;
