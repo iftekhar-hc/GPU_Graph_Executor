@@ -213,6 +213,39 @@ __global__ void matrix_elementwise_multiply_by_const_kernel(int nrow, int ncol,
   }
 }
 
+__global__ void reduce_sum_axis_zero_kernel(int axis0_len,
+                                            int nrow, 
+                                            int ncol,
+                                            const float *input,
+                                            float *output) {
+#if 0
+  for (size_t j = 0; j < nrow; ++j) {
+    for (size_t k = 0; k < ncol; ++k) {
+      float accum = 0.0;
+      for (size_t i = 0; i < axis0_len; ++i) {
+        // accum += input[i][j][k];
+        accum += input[ (i * nrow + j) * ncol + k ];
+      }
+      // output[j][k] = accum;
+      output[ j * ncol + k ] = accum;
+    }
+  }
+#endif
+#if 1
+  size_t k = blockIdx.x; // col_idx
+  size_t j = blockIdx.y; // row_idx
+  if (j < nrow && k < ncol) {
+    float accum = 0.0;
+    for (size_t i = 0; i < axis0_len; ++i) {
+      // accum += input[i][j][k];
+      accum += input[ (i * nrow + j) * ncol + k ];
+    }
+    // output[j][k] = accum;
+    output[j * ncol + k] = accum;
+  }
+#endif
+}
+
 __global__ void broadcast_kernel(int new_axis0_len,
                                  int nrow, 
                                  int ncol,
@@ -320,6 +353,40 @@ int DLGpuBroadcastTo(const DLArrayHandle input, DLArrayHandle output) {
 
 int DLGpuReduceSumAxisZero(const DLArrayHandle input, DLArrayHandle output) {
   /* TODO: Your code here */
+  assert(input->ndim == 3);
+  assert(output->ndim == 2);
+  int nrow = output->shape[0];
+  // Maximum x- or y-dimension of a block = 1024
+  // But we need 'nrow' shared memory, and max shared memory is 48KB.
+  // Conservatively allow max 16KB shared memory.
+  assert(nrow <= 1024 * 4);
+  int ncol = output->shape[1];
+  int axis0_len = input->shape[0];
+  const float *input_data = (const float *)input->data;
+  float *output_data = (float *)output->data;
+  dim3 blocks;
+  dim3 threads;
+#if 1
+  blocks.x = ncol;
+  blocks.y = nrow;
+  // threads.x = axis0_len;
+#endif
+#if 0
+  if (nrow * ncol * new_axis0_len <= 1024) {
+    threads.x = new_axis0_len;
+    threads.y = nrow;
+    threads.z = ncol;
+  } else {
+    blocks.x = ncol;
+    blocks.y = nrow;
+    threads.x = new_axis0_len;
+  }
+#endif
+  reduce_sum_axis_zero_kernel<<<blocks, threads>>>(axis0_len,
+                                                   nrow,
+                                                   ncol, 
+                                                   input_data, 
+                                                   output_data);
   return 0;
 }
 

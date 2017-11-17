@@ -16,37 +16,36 @@ from dlsys import ndarray, gpu_op, autodiff
 #     # x = arr_x.asnumpy()
 #     # np.testing.assert_allclose(np.zeros(shape), x)
 
-def test_broadcast_to():
-    ctx = ndarray.gpu(0)
-    shape = (200, 300)
-    # shape = (3, 4)
-    to_shape = (130, 200, 300)
-    # to_shape = (2, 3, 4)
-    x = np.random.uniform(-1, 1, shape).astype(np.float32)
-    arr_x = ndarray.array(x, ctx=ctx)
-    arr_y = ndarray.empty(to_shape, ctx=ctx)
-    gpu_op.broadcast_to(arr_x, arr_y)
-    y = arr_y.asnumpy()
-    np.testing.assert_allclose(np.broadcast_to(x, to_shape), y)
-  
-# def test_reduce_sum_axis_zero():
+# def test_broadcast_to():
 #     ctx = ndarray.gpu(0)
-#     shape = (500, 200, 100)
-#     to_shape = (200, 100)
-#     x = np.random.uniform(0, 20, shape).astype(np.float32)
+#     shape = (200, 300)
+#     # shape = (3, 4)
+#     to_shape = (130, 200, 300)
+#     # to_shape = (2, 3, 4)
+#     x = np.random.uniform(-1, 1, shape).astype(np.float32)
 #     arr_x = ndarray.array(x, ctx=ctx)
 #     arr_y = ndarray.empty(to_shape, ctx=ctx)
-#     gpu_op.reduce_sum_axis_zero(arr_x, arr_y)
+#     gpu_op.broadcast_to(arr_x, arr_y)
 #     y = arr_y.asnumpy()
-#     y_ = np.sum(x, axis=0)
-#     for index, _ in np.ndenumerate(y):
-#         v = y[index]
-#         v_ = y_[index]
-#         if abs((v - v_) / v_) > 1e-4:
-#             print(index, v, v_)
-#     np.testing.assert_allclose(np.sum(x, axis=0), y, rtol=1e-5)
-# 
-# 
+#     np.testing.assert_allclose(np.broadcast_to(x, to_shape), y)
+  
+def test_reduce_sum_axis_zero():
+    ctx = ndarray.gpu(0)
+    shape = (500, 200, 100)
+    to_shape = (200, 100)
+    x = np.random.uniform(0, 20, shape).astype(np.float32)
+    arr_x = ndarray.array(x, ctx=ctx)
+    arr_y = ndarray.empty(to_shape, ctx=ctx)
+    gpu_op.reduce_sum_axis_zero(arr_x, arr_y)
+    y = arr_y.asnumpy()
+    y_ = np.sum(x, axis=0)
+    for index, _ in np.ndenumerate(y):
+        v = y[index]
+        v_ = y_[index]
+        if abs((v - v_) / v_) > 1e-4:
+            print(index, v, v_)
+    np.testing.assert_allclose(np.sum(x, axis=0), y, rtol=1e-5)
+  
 # def test_matrix_elementwise_add():
 #     ctx = ndarray.gpu(0)
 #     shape = (500, 200)
