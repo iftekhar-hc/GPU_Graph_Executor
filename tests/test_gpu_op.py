@@ -16,19 +16,19 @@ from dlsys import ndarray, gpu_op, autodiff
 #     # x = arr_x.asnumpy()
 #     # np.testing.assert_allclose(np.zeros(shape), x)
 
-
-# def test_broadcast_to():
-#     ctx = ndarray.gpu(0)
-#     shape = (200, 300)
-#     to_shape = (130, 200, 300)
-#     x = np.random.uniform(-1, 1, shape).astype(np.float32)
-#     arr_x = ndarray.array(x, ctx=ctx)
-#     arr_y = ndarray.empty(to_shape, ctx=ctx)
-#     gpu_op.broadcast_to(arr_x, arr_y)
-#     y = arr_y.asnumpy()
-#     np.testing.assert_allclose(np.broadcast_to(x, to_shape), y)
-# 
-# 
+def test_broadcast_to():
+    ctx = ndarray.gpu(0)
+    # shape = (200, 300)
+    shape = (3, 4)
+    # to_shape = (130, 200, 300)
+    to_shape = (2, 3, 4)
+    x = np.random.uniform(-1, 1, shape).astype(np.float32)
+    arr_x = ndarray.array(x, ctx=ctx)
+    arr_y = ndarray.empty(to_shape, ctx=ctx)
+    gpu_op.broadcast_to(arr_x, arr_y)
+    y = arr_y.asnumpy()
+    np.testing.assert_allclose(np.broadcast_to(x, to_shape), y)
+  
 # def test_reduce_sum_axis_zero():
 #     ctx = ndarray.gpu(0)
 #     shape = (500, 200, 100)
@@ -100,22 +100,22 @@ from dlsys import ndarray, gpu_op, autodiff
 #     np.testing.assert_allclose(x * val, y, rtol=1e-5)
 # 
 # 
-def test_matrix_multiply():
-    ctx = ndarray.gpu(0)
-    x = np.random.uniform(0, 10, size=(500, 700)).astype(np.float32)
-    # x = np.random.uniform(0, 10, size=(3, 4)).astype(np.float32)
-    y = np.random.uniform(0, 10, size=(700, 1000)).astype(np.float32)
-    # y = np.random.uniform(0, 10, size=(4, 3)).astype(np.float32)
-    # print("x = ", x)
-    # print("y = ", y)
-    arr_x = ndarray.array(x, ctx=ctx)
-    arr_y = ndarray.array(y, ctx=ctx)
-    arr_z = ndarray.empty((500, 1000), ctx=ctx)
-    # arr_z = ndarray.empty((3, 3), ctx=ctx)
-    gpu_op.matrix_multiply(arr_x, False, arr_y, False, arr_z)
-    z = arr_z.asnumpy()
-    np.testing.assert_allclose(np.dot(x, y), z, rtol=1e-5)
- 
+# def test_matrix_multiply():
+#     ctx = ndarray.gpu(0)
+#     x = np.random.uniform(0, 10, size=(500, 700)).astype(np.float32)
+#     # x = np.random.uniform(0, 10, size=(3, 4)).astype(np.float32)
+#     y = np.random.uniform(0, 10, size=(700, 1000)).astype(np.float32)
+#     # y = np.random.uniform(0, 10, size=(4, 3)).astype(np.float32)
+#     # print("x = ", x)
+#     # print("y = ", y)
+#     arr_x = ndarray.array(x, ctx=ctx)
+#     arr_y = ndarray.array(y, ctx=ctx)
+#     arr_z = ndarray.empty((500, 1000), ctx=ctx)
+#     # arr_z = ndarray.empty((3, 3), ctx=ctx)
+#     gpu_op.matrix_multiply(arr_x, False, arr_y, False, arr_z)
+#     z = arr_z.asnumpy()
+#     np.testing.assert_allclose(np.dot(x, y), z, rtol=1e-5)
+#  
 #     x = np.random.uniform(0, 10, size=(1000, 500)).astype(np.float32)
 #     y = np.random.uniform(0, 10, size=(2000, 500)).astype(np.float32)
 #     arr_x = ndarray.array(x, ctx=ctx)

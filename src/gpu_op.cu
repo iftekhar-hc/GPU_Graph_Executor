@@ -213,6 +213,31 @@ __global__ void matrix_elementwise_multiply_by_const_kernel(int nrow, int ncol,
   }
 }
 
+__global__ void broadcast_kernel(int new_axis0_len,
+                                 int nrow, 
+                                 int ncol,
+                                 const float *input,
+                                 float *output) {
+  for (size_t i = 0; i < new_axis0_len; ++i) {
+    for (size_t j = 0; j < nrow; ++j) {
+      for (size_t k = 0; k < ncol; ++k) {
+        // output[i][j][k] = input[j][k];
+        output[ (i * nrow + j) * ncol + k ] = input[ j * ncol + k ];
+      }
+    }
+  }
+#if 0
+  size_t col_idx = blockIdx.x;
+  size_t row_idx = blockIdx.y;
+  size_t axis0_idx = threadIdx.x;
+  if (axis0_idx < new_axis0_len && row_idx < nrow && col_idx < ncol) {
+    size_t out_idx = (axis0_idx * nrow + row_idx) * ncol + col_idx;
+    size_t in_dx = row_idx * ncol + col_idx;
+    output[out_idx] = input[in_idx];
+  }
+#endif
+}
+
 __global__ void array_set_kernel(int nrow, int ncol,
                                 float *arr,
                                 const float val) {
@@ -254,6 +279,35 @@ int DLGpuArraySet(DLArrayHandle arr, float value) {
 
 int DLGpuBroadcastTo(const DLArrayHandle input, DLArrayHandle output) {
   /* TODO: Your code here */
+  assert(input->ndim == 2);
+  assert(output->ndim == 3);
+  int nrow = input->shape[0];
+  // Maximum x- or y-dimension of a block = 1024
+  // But we need 'nrow' shared memory, and max shared memory is 48KB.
+  // Conservatively allow max 16KB shared memory.
+  assert(nrow <= 1024 * 4);
+  int ncol = input->shape[1];
+  int new_axis0_len = output->shape[0];
+  const float *input_data = (const float *)input->data;
+  float *output_data = (float *)output->data;
+  dim3 blocks;
+  dim3 threads;
+#if 0
+  if (nrow * ncol * new_axis0_len <= 1024) {
+    threads.x = new_axis0_len;
+    threads.y = nrow;
+    threads.z = ncol;
+  } else {
+    blocks.x = ncol;
+    blocks.y = nrow;
+    threads.x = new_axis0_len;
+  }
+#endif
+  broadcast_kernel<<<blocks, threads>>>(new_axis0_len,
+                                        nrow,
+                                        ncol, 
+                                        input_data, 
+                                        output_data);
   return 0;
 }
 
