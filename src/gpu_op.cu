@@ -273,6 +273,46 @@ __global__ void broadcast_kernel(int new_axis0_len,
 #endif
 }
 
+__global__ void relu_kernel(int nrow,
+                            int ncol,
+                            const float *input,
+                            float *output) {
+   size_t i = blockIdx.y;
+   size_t j = blockIdx.x * blockDim.x + threadIdx.x;
+   if (i < nrow && j < ncol) {
+     size_t idx = i * ncol + j;
+     output[idx] = max(input[idx], 0.0);
+   }
+#if 0
+   for (int i = 0; i < nrow; ++i)
+     for (int j = 0; j < ncol; ++j)
+       output[i * ncol + j] = max(input[i * ncol + j], 0.0);
+#endif
+}
+
+__global__ void relu_grad_kernel(int nrow,
+                                 int ncol,
+                                 const float *input,
+                                 const float *in_grad,
+                                 float *output) {
+#if 1
+   size_t i = blockIdx.y;
+   size_t j = blockIdx.x * blockDim.x + threadIdx.x;
+   if (i < nrow && j < ncol) {
+     size_t idx = i * ncol + j;
+     output[idx] = input[idx] > 0.0 ? in_grad[idx] : 0.0;
+   }
+#endif
+#if 0
+   for (int i = 0; i < nrow; ++i) {
+     for (int j = 0; j < ncol; ++j) {
+       size_t idx = i * ncol + j;
+       output[idx] = input[idx] > 0.0 ? in_grad[idx] : 0.0;
+     }
+   }
+#endif
+}
+
 __global__ void array_set_kernel(int nrow, int ncol,
                                 float *arr,
                                 const float val) {
@@ -611,12 +651,68 @@ int DLGpuMatrixMultiply(const DLArrayHandle matA, bool transposeA,
 
 int DLGpuRelu(const DLArrayHandle input, DLArrayHandle output) {
   /* TODO: Your code here */
+  assert(input->ndim == 2);
+  assert(output->ndim == 2);
+  int nrow = input->shape[0];
+  // Maximum x- or y-dimension of a block = 1024
+  // But we need 'nrow' shared memory, and max shared memory is 48KB.
+  // Conservatively allow max 16KB shared memory.
+  assert(nrow <= 1024 * 4);
+  int ncol = input->shape[1];
+  const float *input_data = (const float *)input->data;
+  float *output_data = (float *)output->data;
+  dim3 blocks;
+  dim3 threads;
+#if 1
+  threads.x = 1024;
+  blocks.x = ceil(ncol / 1024);
+  blocks.y = nrow;
+#endif
+  relu_kernel<<<blocks, threads>>>(nrow,
+                                   ncol, 
+                                   input_data, 
+                                   output_data);
+  CHECK_GPU_ERR( cudaPeekAtLastError() );
+  CHECK_GPU_ERR( cudaDeviceSynchronize() );
   return 0;
 }
 
 int DLGpuReluGradient(const DLArrayHandle input, const DLArrayHandle in_grad,
                       DLArrayHandle output) {
   /* TODO: Your code here */
+  assert(input->ndim == 2);
+  assert(in_grad->ndim == 2);
+  assert(output->ndim == 2);
+  int nrow = input->shape[0];
+  // Maximum x- or y-dimension of a block = 1024
+  // But we need 'nrow' shared memory, and max shared memory is 48KB.
+  // Conservatively allow max 16KB shared memory.
+  assert(nrow <= 1024 * 4);
+  int ncol = input->shape[1];
+  const float *input_data = (const float *)input->data;
+  const float *in_grad_data = (const float *)in_grad->data;
+  float *output_data = (float *)output->data;
+  dim3 blocks;
+  dim3 threads;
+#if 1
+  threads.x = 1024;
+  blocks.x = (ncol + 1024 - 1) / 1024;
+  blocks.y = nrow;
+#endif
+#if 0
+  threads.x = 2;
+  // blocks.x = 3;
+  blocks.x = (ncol + 2 - 1 / 2);
+  blocks.y = nrow;
+#endif
+
+  relu_grad_kernel<<<blocks, threads>>>(nrow,
+                                        ncol, 
+                                        input_data, 
+                                        in_grad_data,
+                                        output_data);
+  CHECK_GPU_ERR( cudaPeekAtLastError() );
+  CHECK_GPU_ERR( cudaDeviceSynchronize() );
   return 0;
 }
 

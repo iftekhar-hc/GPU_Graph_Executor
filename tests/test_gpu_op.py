@@ -29,22 +29,22 @@ from dlsys import ndarray, gpu_op, autodiff
 #     y = arr_y.asnumpy()
 #     np.testing.assert_allclose(np.broadcast_to(x, to_shape), y)
   
-def test_reduce_sum_axis_zero():
-    ctx = ndarray.gpu(0)
-    shape = (500, 200, 100)
-    to_shape = (200, 100)
-    x = np.random.uniform(0, 20, shape).astype(np.float32)
-    arr_x = ndarray.array(x, ctx=ctx)
-    arr_y = ndarray.empty(to_shape, ctx=ctx)
-    gpu_op.reduce_sum_axis_zero(arr_x, arr_y)
-    y = arr_y.asnumpy()
-    y_ = np.sum(x, axis=0)
-    for index, _ in np.ndenumerate(y):
-        v = y[index]
-        v_ = y_[index]
-        if abs((v - v_) / v_) > 1e-4:
-            print(index, v, v_)
-    np.testing.assert_allclose(np.sum(x, axis=0), y, rtol=1e-5)
+# def test_reduce_sum_axis_zero():
+#     ctx = ndarray.gpu(0)
+#     shape = (500, 200, 100)
+#     to_shape = (200, 100)
+#     x = np.random.uniform(0, 20, shape).astype(np.float32)
+#     arr_x = ndarray.array(x, ctx=ctx)
+#     arr_y = ndarray.empty(to_shape, ctx=ctx)
+#     gpu_op.reduce_sum_axis_zero(arr_x, arr_y)
+#     y = arr_y.asnumpy()
+#     y_ = np.sum(x, axis=0)
+#     for index, _ in np.ndenumerate(y):
+#         v = y[index]
+#         v_ = y_[index]
+#         if abs((v - v_) / v_) > 1e-4:
+#             print(index, v, v_)
+#     np.testing.assert_allclose(np.sum(x, axis=0), y, rtol=1e-5)
   
 # def test_matrix_elementwise_add():
 #     ctx = ndarray.gpu(0)
@@ -144,20 +144,21 @@ def test_reduce_sum_axis_zero():
 #     gpu_op.relu(arr_x, arr_y)
 #     y = arr_y.asnumpy()
 #     np.testing.assert_allclose(np.maximum(x, 0).astype(np.float32), y)
-# 
-# 
-# def test_relu_gradient():
-#     shape = (2000, 2500)
-#     ctx = ndarray.gpu(0)
-#     x = np.random.uniform(-1, 1, shape).astype(np.float32)
-#     grad_x = np.random.uniform(-5, 5, shape).astype(np.float32)
-#     arr_x = ndarray.array(x, ctx=ctx)
-#     arr_grad_x = ndarray.array(grad_x, ctx=ctx)
-#     arr_y = ndarray.empty(shape, ctx=ctx)
-#     gpu_op.relu_gradient(arr_x, arr_grad_x, arr_y)
-#     y = arr_y.asnumpy()
-#     np.testing.assert_allclose(((x > 0) * grad_x).astype(np.float32), y)
-# 
+#  
+#  
+def test_relu_gradient():
+    shape = (2000, 2500)
+    # shape = (4, 5)
+    ctx = ndarray.gpu(0)
+    x = np.random.uniform(-1, 1, shape).astype(np.float32)
+    grad_x = np.random.uniform(-5, 5, shape).astype(np.float32)
+    arr_x = ndarray.array(x, ctx=ctx)
+    arr_grad_x = ndarray.array(grad_x, ctx=ctx)
+    arr_y = ndarray.empty(shape, ctx=ctx)
+    gpu_op.relu_gradient(arr_x, arr_grad_x, arr_y)
+    y = arr_y.asnumpy()
+    np.testing.assert_allclose(((x > 0) * grad_x).astype(np.float32), y)
+ 
 # 
 # def test_softmax():
 #     ctx = ndarray.gpu(0)
