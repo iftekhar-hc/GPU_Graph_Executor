@@ -82,17 +82,24 @@ __global__ void softmax_kernel(int nrow,
 #endif
    for (int i = 0; i < nrow; ++i) {
      float max_val = 1e-9;
-     float sum = 0.0;
      for (int j = 0; j < ncol; ++j) {
        float cur_val = input[i * ncol + j]; 
        max_val = max(cur_val, max_val);
-       sum += cur_val;
      }
      for (int j = 0; j < ncol; ++j) {
        size_t idx = i * ncol + j;
-       float norm_val = input[idx] - max_val;
-       output[idx] = exp(norm_val) / sum;
+       output[idx] = input[idx] - max_val;
      }
+     float sum = 0.0;
+     for (int j = 0; j < ncol; ++j) {
+       size_t idx = i * ncol + j;
+       sum += output[idx];
+     }
+     for (int j = 0; j < ncol; ++j) {
+       size_t idx = i * ncol + j;
+       output[idx] = exp(output[idx]) / sum;
+     }
+
    }
 }
 
