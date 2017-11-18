@@ -146,31 +146,31 @@ from dlsys import ndarray, gpu_op, autodiff
 #     np.testing.assert_allclose(np.maximum(x, 0).astype(np.float32), y)
 #  
 #  
-def test_relu_gradient():
-    shape = (2000, 2500)
-    # shape = (4, 5)
-    ctx = ndarray.gpu(0)
-    x = np.random.uniform(-1, 1, shape).astype(np.float32)
-    grad_x = np.random.uniform(-5, 5, shape).astype(np.float32)
-    arr_x = ndarray.array(x, ctx=ctx)
-    arr_grad_x = ndarray.array(grad_x, ctx=ctx)
-    arr_y = ndarray.empty(shape, ctx=ctx)
-    gpu_op.relu_gradient(arr_x, arr_grad_x, arr_y)
-    y = arr_y.asnumpy()
-    np.testing.assert_allclose(((x > 0) * grad_x).astype(np.float32), y)
- 
-# 
-# def test_softmax():
+# def test_relu_gradient():
+#     shape = (2000, 2500)
+#     # shape = (4, 5)
 #     ctx = ndarray.gpu(0)
-#     shape = (400, 1000)
-#     x = np.random.uniform(-5, 5, shape).astype(np.float32)
+#     x = np.random.uniform(-1, 1, shape).astype(np.float32)
+#     grad_x = np.random.uniform(-5, 5, shape).astype(np.float32)
 #     arr_x = ndarray.array(x, ctx=ctx)
+#     arr_grad_x = ndarray.array(grad_x, ctx=ctx)
 #     arr_y = ndarray.empty(shape, ctx=ctx)
-#     gpu_op.softmax(arr_x, arr_y)
+#     gpu_op.relu_gradient(arr_x, arr_grad_x, arr_y)
 #     y = arr_y.asnumpy()
-#     np.testing.assert_allclose(autodiff.softmax_func(x), y, rtol=1e-5)
+#     np.testing.assert_allclose(((x > 0) * grad_x).astype(np.float32), y)
+#  
 # 
-# 
+def test_softmax():
+    ctx = ndarray.gpu(0)
+    # shape = (400, 1000)
+    shape = (2, 5)
+    x = np.random.uniform(-5, 5, shape).astype(np.float32)
+    arr_x = ndarray.array(x, ctx=ctx)
+    arr_y = ndarray.empty(shape, ctx=ctx)
+    gpu_op.softmax(arr_x, arr_y)
+    y = arr_y.asnumpy()
+    np.testing.assert_allclose(autodiff.softmax_func(x), y, rtol=1e-5)
+
 # def test_softmax_cross_entropy():
 #     ctx = ndarray.gpu(0)
 #     shape = (400, 1000)

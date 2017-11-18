@@ -63,6 +63,39 @@ __global__ void matrix_softmax_cross_entropy_kernel(int nrow, int ncol,
   }
 }
 
+__global__ void softmax_kernel(int nrow,
+                               int ncol,
+                               const float *input,
+                               float *output) {
+#if 0
+   size_t i = blockIdx.y;
+   size_t j = blockIdx.x * blockDim.x + threadIdx.x;
+   if (i < nrow && j < ncol) {
+     size_t idx = i * ncol + j;
+     output[idx] = max(input[idx], 0.0);
+   }
+#endif
+#if 0
+   for (int i = 0; i < nrow; ++i)
+     for (int j = 0; j < ncol; ++j)
+       output[i * ncol + j] = max(input[i * ncol + j], 0.0);
+#endif
+   for (int i = 0; i < nrow; ++i) {
+     float max_val = 1e-9;
+     float sum = 0.0;
+     for (int j = 0; j < ncol; ++j) {
+       float cur_val = input[i * ncol + j]; 
+       max_val = max(cur_val, max_val);
+       sum += cur_val;
+     }
+     for (int j = 0; j < ncol; ++j) {
+       size_t idx = i * ncol + j;
+       float norm_val = input[idx] - max_val;
+       output[idx] = exp(norm_val) / sum;
+     }
+   }
+}
+
 __global__ void matrix_elementwise_add_kernel(int nrow, int ncol,
                                               const float *matA,
                                               const float *matB,
@@ -718,6 +751,29 @@ int DLGpuReluGradient(const DLArrayHandle input, const DLArrayHandle in_grad,
 
 int DLGpuSoftmax(const DLArrayHandle input, DLArrayHandle output) {
   /* TODO: Your code here */
+  assert(input->ndim == 2);
+  assert(output->ndim == 2);
+  int nrow = input->shape[0];
+  // Maximum x- or y-dimension of a block = 1024
+  // But we need 'nrow' shared memory, and max shared memory is 48KB.
+  // Conservatively allow max 16KB shared memory.
+  assert(nrow <= 1024 * 4);
+  int ncol = input->shape[1];
+  const float *input_data = (const float *)input->data;
+  float *output_data = (float *)output->data;
+  dim3 blocks;
+  dim3 threads;
+#if 0
+  threads.x = 1024;
+  blocks.x = ceil(ncol / 1024);
+  blocks.y = nrow;
+#endif
+  softmax_kernel<<<blocks, threads>>>(nrow,
+                                      ncol, 
+                                      input_data, 
+                                      output_data);
+  CHECK_GPU_ERR( cudaPeekAtLastError() );
+  CHECK_GPU_ERR( cudaDeviceSynchronize() );
   return 0;
 }
 
