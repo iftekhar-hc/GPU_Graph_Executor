@@ -155,12 +155,12 @@ __global__ void matrix_elementwise_add_by_const_kernel(int nrow, int ncol,
   }
 }
 
-__global__ void matrix__multiply_kernel(const float *matA,
-                                        const float *matB,
-                                        float *matC,
-                                        int nrow,
-                                        int ncol,
-                                        int width) {
+__global__ void matrix_multiply_kernel(const float *matA,
+                                       const float *matB,
+                                       float *matC,
+                                       int nrow,
+                                       int ncol,
+                                       int width) {
   // int tid_x = blockIdx.x * blockDim.x + threadIdx.x;
   // int tid_y = blockIdx.y * blockDim.y + threadIdx.y;
 #if 0
@@ -212,6 +212,7 @@ __global__ void matrix__multiply_kernel(const float *matA,
      }
   }
 #endif
+#if 0
   size_t row_idx = blockIdx.x;
   size_t col_idx = threadIdx.x;
   if (row_idx < nrow && col_idx < ncol) {
@@ -219,6 +220,79 @@ __global__ void matrix__multiply_kernel(const float *matA,
     for (size_t k = 0; k < width; ++k) {
       size_t val_a_idx = row_idx * width + k;
       size_t val_b_idx = k * ncol + col_idx;
+      accum_val += matA[val_a_idx] * matB[val_b_idx];
+    }
+    size_t out_idx = row_idx * ncol + col_idx;
+    matC[out_idx] = accum_val;
+  }
+#endif
+  size_t row_idx = blockIdx.y;
+  size_t col_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (row_idx < nrow && col_idx < ncol) {
+    float accum_val = 0.0;
+    for (size_t k = 0; k < width; ++k) {
+      size_t val_a_idx = row_idx * width + k;
+      size_t val_b_idx = k * ncol + col_idx;
+      accum_val += matA[val_a_idx] * matB[val_b_idx];
+    }
+    size_t out_idx = row_idx * ncol + col_idx;
+    matC[out_idx] = accum_val;
+  }
+}
+
+__global__ void matrix_multiply_transA_kernel(const float *matA,
+                                              const float *matB,
+                                              float *matC,
+                                              int nrow,
+                                              int ncol,
+                                              int width) {
+  size_t row_idx = blockIdx.y;
+  size_t col_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (row_idx < nrow && col_idx < ncol) {
+    float accum_val = 0.0;
+    for (size_t k = 0; k < width; ++k) {
+      size_t val_a_idx = k * nrow + row_idx;
+      size_t val_b_idx = k * ncol + col_idx;
+      accum_val += matA[val_a_idx] * matB[val_b_idx];
+    }
+    size_t out_idx = row_idx * ncol + col_idx;
+    matC[out_idx] = accum_val;
+  }
+}
+
+__global__ void matrix_multiply_transB_kernel(const float *matA,
+                                              const float *matB,
+                                              float *matC,
+                                              int nrow,
+                                              int ncol,
+                                              int width) {
+  size_t row_idx = blockIdx.y;
+  size_t col_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (row_idx < nrow && col_idx < ncol) {
+    float accum_val = 0.0;
+    for (size_t k = 0; k < width; ++k) {
+      size_t val_a_idx = row_idx * width + k;
+      size_t val_b_idx = col_idx * width + k;
+      accum_val += matA[val_a_idx] * matB[val_b_idx];
+    }
+    size_t out_idx = row_idx * ncol + col_idx;
+    matC[out_idx] = accum_val;
+  }
+}
+
+__global__ void matrix_multiply_transA_transB_kernel(const float *matA,
+                                                     const float *matB,
+                                                     float *matC,
+                                                     int nrow,
+                                                     int ncol,
+                                                     int width) {
+  size_t row_idx = blockIdx.y;
+  size_t col_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (row_idx < nrow && col_idx < ncol) {
+    float accum_val = 0.0;
+    for (size_t k = 0; k < width; ++k) {
+      size_t val_a_idx = k * nrow + row_idx;
+      size_t val_b_idx = col_idx * width + k;
       accum_val += matA[val_a_idx] * matB[val_b_idx];
     }
     size_t out_idx = row_idx * ncol + col_idx;
@@ -616,15 +690,17 @@ int DLGpuMatrixMultiply(const DLArrayHandle matA, bool transposeA,
   assert(matC->ndim == 2);
   // printf("%d %d %d %d\n", matA->shape[0], matA->shape[1], matB->shape[0], matB->shape[1]);
   // printf("%d %d\n", matC->shape[0], matC->shape[1]);
+#if 0
   assert(matA->shape[1] == matB->shape[0] &&
          matC->shape[0] == matA->shape[0] &&
          matC->shape[1] == matB->shape[1]);
+#endif
   int nrow = matC->shape[0];
   // Maximum x- or y-dimension of a block = 1024
   // But we need 'nrow' shared memory, and max shared memory is 48KB.
   // Conservatively allow max 16KB shared memory.
   assert(nrow <= 1024 * 4);
-  int width = matA->shape[1];
+  int width = transposeA ? matA->shape[0] : matA->shape[1];
   int ncol = matC->shape[1];
   const float *matA_data = (const float *)matA->data;
   const float *matB_data = (const float *)matB->data;
@@ -637,9 +713,14 @@ int DLGpuMatrixMultiply(const DLArrayHandle matA, bool transposeA,
     threads.y = ncol;
   } else {
 #endif
+    blocks.x = (ncol + 1024 - 1) / 1024; // 2
+    blocks.y = nrow; // 1000
+    threads.x = min(ncol, 1024); // 1024
+#if 0
     blocks.x = nrow;
     // blocks.y = 1;
     threads.x = min(ncol, 1024);
+#endif
     // threads.y = 1;
     // blocks.x = (ncol + 1024 - 1) / 1024;
     // blocks.y = nrow;
@@ -653,38 +734,42 @@ int DLGpuMatrixMultiply(const DLArrayHandle matA, bool transposeA,
 #if 0
   }
 #endif
-#if 0
-  // printf("here");
-  for (size_t i = 0; i < nrow; ++i) {
-    for (size_t j = 0; j < width; ++j) {
-       size_t idx = i * width + j;
-       printf("%d ", idx);
-       // printf("%f ", matA_data[idx]);
-       // printf("%f ", matA_data[i][j]);
-    }
-    printf("\n");
-  }
-  // printf("here1");
-  for (size_t i = 0; i < width; ++i) {
-    for (size_t j = 0; j < ncol; ++j) {
-       size_t idx = i * ncol + j;
-       printf("%d ", idx);
-       // printf("%f ", matB_data[idx]);
-       // printf("%f ", matB_data[i][j]);
-    }
-    printf("\n");
-  }
-  // printf("here2");
-#endif
   // 1 block, each block with 'threads' number of threads with 'nrow' shared
   // memory size
-  matrix__multiply_kernel<<<blocks, threads>>>(matA_data, 
-                                               matB_data, 
-                                               matC_data,
-                                               nrow,
-                                               ncol,
-                                               width);
-  cudaDeviceSynchronize();
+  if (!transposeA && !transposeB) {
+    matrix_multiply_kernel<<<blocks, threads>>>(matA_data,
+                                                matB_data,
+                                                matC_data,
+                                                nrow,
+                                                ncol,
+                                                width);
+  }
+  else if (transposeA && !transposeB) {
+    matrix_multiply_transA_kernel<<<blocks, threads>>>(matA_data,
+                                                           matB_data,
+                                                           matC_data,
+                                                           nrow,
+                                                           ncol,
+                                                           width);
+  }
+  else if (!transposeA && transposeB) {
+    matrix_multiply_transB_kernel<<<blocks, threads>>>(matA_data,
+                                                           matB_data,
+                                                           matC_data,
+                                                           nrow,
+                                                           ncol,
+                                                           width);
+  }
+  else if (transposeA && transposeB) {
+    matrix_multiply_transA_transB_kernel<<<blocks, threads>>>(matA_data,
+                                                           matB_data,
+                                                           matC_data,
+                                                           nrow,
+                                                           ncol,
+                                                           width);
+  }
+  CHECK_GPU_ERR( cudaPeekAtLastError() );
+  CHECK_GPU_ERR( cudaDeviceSynchronize() );
   return 0;
 }
 
